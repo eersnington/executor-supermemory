@@ -4,4 +4,4 @@ This project is using Vite+, a unified toolchain built on top of Vite, Rolldown,
 
 ## Review Checklist
 
-- [ ] Run `bun run check` and `bun run test` to format, lint, type check and test changes.
+- `bun run check` and `bun run test` to format, lint, type check and test changes.

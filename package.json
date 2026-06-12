@@ -1,6 +1,6 @@
 {
   "name": "executor-supermemory",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Executor plugin for Supermemory hosted and local memory APIs.",
   "homepage": "https://github.com/eersnington/executor-supermemory#readme",
   "bugs": {
@@ -18,8 +18,6 @@
   "type": "module",
   "exports": {
     ".": "./dist/index.mjs",
-    "./promise": "./dist/promise.mjs",
-    "./sdk": "./dist/sdk/index.mjs",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -48,8 +46,5 @@
     "vite": "npm:@voidzero-dev/vite-plus-core@latest",
     "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
   },
-  "packageManager": "bun@1.3.14",
-  "inlinedDependencies": {
-    "@standard-schema/spec": "1.1.0"
-  }
+  "packageManager": "bun@1.3.14"
 }
