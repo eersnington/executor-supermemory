@@ -28,6 +28,59 @@ const config = {
 
 const owner = "org" as Owner;
 
+test("supermemory exposes a local setup tool for Executor CLI users", () => {
+  const plugin = supermemoryPlugin();
+  const extension = { setupLocal: () => Effect.succeed(null) };
+  const sources = plugin.staticSources!(extension as never);
+
+  expect(sources).toHaveLength(1);
+  expect(sources[0]).toMatchObject({ id: "supermemory", kind: "executor", name: "Supermemory" });
+  expect(sources[0]?.tools.map((tool: { readonly name: string }) => tool.name)).toEqual([
+    "setupLocal",
+  ]);
+});
+
+test("setupLocal registers a local Supermemory integration and returns handoff URL", async () => {
+  const registered: unknown[] = [];
+  const plugin = supermemoryPlugin({ defaultContainerTag: "project_alpha" });
+  const extension = plugin.extension!({
+    core: {
+      integrations: {
+        register: (input: unknown) =>
+          Effect.sync(() => {
+            registered.push(input);
+          }),
+      },
+    },
+  } as never);
+
+  const result = await Effect.runPromise(
+    extension.setupLocal({ label: "Local Supermemory" }) as Effect.Effect<unknown>,
+  );
+
+  expect(registered).toEqual([
+    {
+      slug: IntegrationSlug.make("supermemory"),
+      description: "Supermemory memory API",
+      config: {
+        kind: "supermemory",
+        baseURL: "http://localhost:6767",
+        defaultContainerTag: "project_alpha",
+        defaults: { searchMode: "hybrid", limit: 10, threshold: 0.6 },
+      },
+      canRemove: true,
+      canRefresh: true,
+    },
+  ]);
+  expect(result).toEqual({
+    integration: "supermemory",
+    handoffUrl:
+      "/integrations/supermemory?addAccount=1&owner=org&template=api-key&label=Local+Supermemory",
+    instructions:
+      "Open /integrations/supermemory?addAccount=1&owner=org&template=api-key&label=Local+Supermemory and paste the API key printed by `npx supermemory local`.",
+  });
+});
+
 test("supermemory connection resolves focused dynamic tools", async () => {
   const plugin = supermemoryPlugin();
   const resolved = await Effect.runPromise(

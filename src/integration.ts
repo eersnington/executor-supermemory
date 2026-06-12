@@ -1,6 +1,7 @@
 import { AuthTemplateSlug } from "@executor-js/sdk/core";
 
 export const hostedBaseURL = "https://api.supermemory.ai";
+export const localBaseURL = "http://localhost:6767";
 export const apiKeyTemplate = AuthTemplateSlug.make("api-key");
 
 export interface SupermemoryPluginOptions {
@@ -21,6 +22,14 @@ export interface AddIntegrationInput {
     readonly limit?: number;
     readonly threshold?: number;
   };
+}
+
+export interface SetupLocalInput {
+  readonly slug?: string;
+  readonly baseURL?: string;
+  readonly defaultContainerTag?: string;
+  readonly owner?: "org" | "user";
+  readonly label?: string;
 }
 
 export interface SupermemoryIntegrationConfig {
