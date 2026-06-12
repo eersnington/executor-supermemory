@@ -1,49 +1,33 @@
 # executor-supermemory
 
-Executor plugin for [Supermemory](https://supermemory.ai), including hosted and local/self-hosted Supermemory.
+Executor plugin for Supermemory hosted and local APIs.
 
-## Local Supermemory
+## Install
 
-Setup Supermemory local:
+```bash
+bun add executor-supermemory
+```
+
+## Supermemory Local
 
 ```bash
 npx supermemory local
 ```
 
-Or run the installed server directly:
+Use the printed API key and `http://localhost:6767`.
 
-```bash
-supermemory-server
-```
-
-First boot prints a local API key. The local API runs at `http://localhost:6767`.
-
-## Programmatic Executor Usage
-
-Add the plugin when creating an Executor:
+## Configure Plugin
 
 ```ts
-import { createExecutor } from "@executor-js/sdk";
-import { fileSecretsPlugin } from "@executor-js/plugin-file-secrets";
 import { supermemoryPlugin } from "executor-supermemory";
 
-const executor = await createExecutor({
-  onElicitation: "accept-all",
-  plugins: [
-    fileSecretsPlugin(),
-    supermemoryPlugin({
-      baseURL: "http://localhost:6767",
-      defaultContainerTag: "project_alpha",
-    }),
-  ] as const,
+supermemoryPlugin({
+  baseURL: "http://localhost:6767",
+  defaultContainerTag: "project_alpha",
 });
 ```
 
-API keys are stored in Executor connections, not in plugin options.
-
-## Add Integration
-
-Register the Supermemory integration, then create a connection with a hosted or local API key:
+## Register Connection
 
 ```ts
 await executor.supermemory.addIntegration({
@@ -61,44 +45,7 @@ await executor.connections.create({
 });
 ```
 
-## Executor From Source
-
-Run Executor from a source clone and add the plugin to Local Executor's static plugin list.
-
-```bash
-cd ~/Development
-git clone https://github.com/RhysSullivan/executor.git
-cd executor
-bun install
-bun add executor-supermemory
-bun dev
-```
-
-For local package development, install this repository by path instead of from npm.
-
-Edit `apps/local/executor.config.ts` in the Executor repo:
-
-```ts
-import { supermemoryPlugin } from "executor-supermemory";
-
-export default defineExecutorConfig({
-  plugins: () =>
-    [
-      // existing Local Executor plugins...
-      supermemoryPlugin({
-        baseURL: "http://localhost:6767",
-        defaultContainerTag: "project_alpha",
-      }),
-    ] as const,
-});
-```
-
-You can also run the source CLI with an isolated dev data directory:
-
-```bash
-bun run dev:cli -- web
-bun run dev:cli -- daemon run --foreground
-```
+API keys are stored in Executor connections, not plugin options.
 
 ## Tools
 
@@ -126,20 +73,6 @@ await executor.execute(ToolAddress.make("tools.supermemory.org.main.recall"), {
 });
 ```
 
-Add memory to a configured project container:
+## Local Development With Executor Source
 
-```ts
-await executor.execute(ToolAddress.make("tools.supermemory.org.main.memory.save"), {
-  content: "This project packages with vp pack before release.",
-  metadata: { type: "project-config" },
-});
-```
-
-Override the configured container per call:
-
-```ts
-await executor.execute(ToolAddress.make("tools.supermemory.org.main.profile"), {
-  containerTag: "user_alpha",
-  query: "coding preferences",
-});
-```
+When running Executor from source, install this package into the Executor repo and add `supermemoryPlugin(...)` to `apps/local/executor.config.ts`.
