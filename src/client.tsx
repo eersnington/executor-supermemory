@@ -11,8 +11,8 @@ import {
 } from "@executor-js/sdk/client";
 
 import { SupermemoryGroup } from "./api/group.ts";
+import { supermemoryIconUrl } from "./icon.ts";
 
-const supermemoryIconUrl = "https://supermemory.ai/favicon.svg";
 const integrationWriteKeys = ["integrations", "tools"] as const;
 
 const SupermemoryClient = createPluginAtomClient(SupermemoryGroup);

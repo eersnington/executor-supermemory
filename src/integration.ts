@@ -1,8 +1,9 @@
 import { AuthTemplateSlug } from "@executor-js/sdk/core";
 
+export { supermemoryIconUrl } from "./icon.ts";
+
 export const hostedBaseURL = "https://api.supermemory.ai";
 export const localBaseURL = "http://localhost:6767";
-export const supermemoryIconUrl = "https://supermemory.ai/favicon.svg";
 export const cloudApiKeyTemplate = AuthTemplateSlug.make("cloud-api-key");
 export const localApiKeyTemplate = AuthTemplateSlug.make("local-api-key");
 export const localNoAuthTemplate = AuthTemplateSlug.make("local-none");
