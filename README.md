@@ -12,6 +12,8 @@ bun add executor-supermemory
 
 ```bash
 npx supermemory local
+# or run
+supermemory-server
 ```
 
 Use the printed API key and `http://localhost:6767`.
@@ -19,31 +21,22 @@ Use the printed API key and `http://localhost:6767`.
 ## Configure Plugin
 
 ```ts
-import { supermemoryPlugin } from "executor-supermemory";
+import { supermemoryHttpPlugin } from "executor-supermemory/api";
 
-supermemoryPlugin({
-  baseURL: "http://localhost:6767",
+supermemoryHttpPlugin({
   defaultContainerTag: "project_alpha",
 });
 ```
 
-## Register Connection
+Set `baseURL: "http://localhost:6767"` only when you also want static local no-auth tools available outside the Connect flow.
 
-```ts
-await executor.supermemory.addIntegration({
-  slug: "supermemory",
-  baseURL: "http://localhost:6767",
-  defaultContainerTag: "project_alpha",
-});
+## Connect
 
-await executor.connections.create({
-  owner: "org",
-  name: "main",
-  integration: "supermemory",
-  template: "api-key",
-  value: process.env.SUPERMEMORY_API_KEY!,
-});
-```
+Open Executor, choose **Connect integration**, then pick **Supermemory**. Add one of these connection types:
+
+- `Cloud API key` for hosted Supermemory.
+- `Local no auth` for the local server at `http://localhost:6767`.
+- `Local API key` for the local server with its printed API key.
 
 API keys are stored in Executor connections, not plugin options.
 
@@ -61,18 +54,6 @@ Tools are resolved per Executor connection:
 
 Write and destructive tools require Executor approval. API keys are read from the Executor connection credential and are never stored in plugin options.
 
-## Examples
-
-Search project memory:
-
-```ts
-import { ToolAddress } from "@executor-js/sdk";
-
-await executor.execute(ToolAddress.make("tools.supermemory.org.main.recall"), {
-  query: "deployment errors",
-});
-```
-
 ## Local Development With Executor Source
 
-When running Executor from source, install this package into the Executor repo and add `supermemoryPlugin(...)` to `apps/local/executor.config.ts`.
+When running Executor from source, install this package into the Executor repo and add `supermemoryHttpPlugin(...)` to `apps/local/executor.config.ts`.
