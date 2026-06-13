@@ -18,6 +18,7 @@
   "type": "module",
   "exports": {
     ".": "./dist/index.mjs",
+    "./api": "./dist/api/index.mjs",
     "./client": "./dist/client.mjs",
     "./server": "./dist/server.mjs",
     "./package.json": "./package.json"
@@ -33,16 +34,32 @@
     "prepublishOnly": "vp run build",
     "prepare": "vp config"
   },
-  "dependencies": {
-    "@executor-js/sdk": "1.5.6",
-    "effect": "4.0.0-beta.59"
-  },
   "devDependencies": {
+    "@effect/atom-react": "4.0.0-beta.59",
+    "@executor-js/sdk": "1.5.6",
     "@types/node": "^25.6.2",
+    "@types/react": "^19.2.7",
     "@typescript/native-preview": "7.0.0-dev.20260509.2",
+    "@voidzero-dev/vite-plus-test": "^0.1.24",
     "bumpp": "^11.1.0",
+    "effect": "4.0.0-beta.59",
+    "react": "^19.2.3",
     "typescript": "^6.0.3",
     "vite-plus": "^0.1.20"
+  },
+  "peerDependencies": {
+    "@effect/atom-react": "4.0.0-beta.59",
+    "@executor-js/sdk": ">=1.5.4 <2",
+    "effect": "4.0.0-beta.59",
+    "react": "^19.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@effect/atom-react": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
   },
   "overrides": {
     "vite": "npm:@voidzero-dev/vite-plus-core@latest",

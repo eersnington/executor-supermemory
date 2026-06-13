@@ -3,6 +3,7 @@ import {
   IntegrationDetectionResult,
   IntegrationSlug,
   Schema,
+  type StorageFailure,
   ToolResult,
   definePlugin,
   tool,
@@ -10,11 +11,16 @@ import {
 import type { InvokeToolInput, PluginCtx, StaticToolExecuteContext } from "@executor-js/sdk/core";
 
 import {
-  apiKeyTemplate,
+  cloudApiKeyTemplate,
+  hostedBaseURL,
   isLocalSupermemoryBaseURL,
   localBaseURL,
+  localApiKeyTemplate,
+  localNoAuthTemplate,
   noAuthTemplate,
   resolveSupermemoryIntegrationConfig,
+  supermemoryBaseURLForTemplate,
+  supermemoryIconUrl,
 } from "./integration.ts";
 import type {
   AddIntegrationInput,
@@ -39,6 +45,9 @@ import {
   toolDefinitions,
 } from "./tools.ts";
 
+type SupermemoryStore = Record<never, never>;
+type ExistingIntegration = Readonly<Record<string, unknown>>;
+
 const SaveMemoryInputStaticSchema = Schema.toStandardSchemaV1(
   Schema.toStandardJSONSchemaV1(SaveMemoryInput),
 );
@@ -56,7 +65,7 @@ const ProjectsListInputStaticSchema = Schema.toStandardSchemaV1(
 );
 
 function invokeSupermemoryTool(input: {
-  readonly ctx: PluginCtx;
+  readonly ctx: PluginCtx<SupermemoryStore>;
   readonly toolName: string;
   readonly args: unknown;
   readonly config: SupermemoryIntegrationConfig;
@@ -77,11 +86,11 @@ function invokeSupermemoryTool(input: {
   });
 }
 
-const supermemoryApiKeyAuthMethod = {
-  id: apiKeyTemplate,
-  label: "Supermemory API key",
+const cloudApiKeyAuthMethod = {
+  id: cloudApiKeyTemplate,
+  label: "Cloud API key",
   kind: "apikey" as const,
-  template: apiKeyTemplate,
+  template: cloudApiKeyTemplate,
   placements: [
     {
       carrier: "header" as const,
@@ -92,17 +101,25 @@ const supermemoryApiKeyAuthMethod = {
   ],
 };
 
+const localApiKeyAuthMethod = {
+  id: localApiKeyTemplate,
+  label: "Local API key",
+  kind: "apikey" as const,
+  template: localApiKeyTemplate,
+  placements: cloudApiKeyAuthMethod.placements,
+};
+
 const localNoAuthMethod = {
-  id: noAuthTemplate,
-  label: "Local Supermemory auto-auth",
+  id: localNoAuthTemplate,
+  label: "Local no auth",
   kind: "none" as const,
-  template: noAuthTemplate,
+  template: localNoAuthTemplate,
 };
 
 function localSupermemoryTools(config: SupermemoryIntegrationConfig) {
   const execute =
     (toolName: string) =>
-    (args: unknown, { ctx }: StaticToolExecuteContext) =>
+    (args: unknown, { ctx }: StaticToolExecuteContext<SupermemoryStore>) =>
       invokeSupermemoryTool({ ctx, toolName, args, config });
 
   return [
@@ -151,26 +168,29 @@ function localSupermemoryTools(config: SupermemoryIntegrationConfig) {
   ];
 }
 
-interface SupermemoryPluginExtension {
-  readonly addIntegration: (input?: AddIntegrationInput) => Effect.Effect<void, unknown>;
-  readonly getIntegration: (slug?: string) => Effect.Effect<unknown, unknown>;
+export interface SupermemoryPluginExtension {
+  readonly addIntegration: (input?: AddIntegrationInput) => Effect.Effect<void, StorageFailure>;
+  readonly getIntegration: (
+    slug?: string,
+  ) => Effect.Effect<ExistingIntegration | null, StorageFailure>;
   readonly setupLocal: (input?: SetupLocalInput) => Effect.Effect<
     {
       readonly integration: string;
       readonly handoffUrl: string;
       readonly instructions: string;
     },
-    unknown,
-    unknown
+    StorageFailure
   >;
 }
 
 export const supermemoryPlugin = definePlugin((options: SupermemoryPluginOptions = {}) => ({
   id: "supermemory" as const,
   packageName: "executor-supermemory",
-  storage: () => ({}),
-  extension: (ctx: PluginCtx): SupermemoryPluginExtension => {
-    const addIntegration = (input: AddIntegrationInput = {}) => {
+  storage: (): SupermemoryStore => ({}),
+  extension: (ctx: PluginCtx<SupermemoryStore>): SupermemoryPluginExtension => {
+    const addIntegration = (
+      input: AddIntegrationInput = {},
+    ): Effect.Effect<void, StorageFailure> => {
       const config = resolveSupermemoryIntegrationConfig(input, options, process.env);
 
       return ctx.core.integrations.register({
@@ -182,10 +202,14 @@ export const supermemoryPlugin = definePlugin((options: SupermemoryPluginOptions
       });
     };
 
+    const getIntegration = (
+      slug = "supermemory",
+    ): Effect.Effect<ExistingIntegration | null, StorageFailure> =>
+      ctx.core.integrations.get(IntegrationSlug.make(slug));
+
     return {
       addIntegration,
-      getIntegration: (slug = "supermemory") =>
-        ctx.core.integrations.get(IntegrationSlug.make(slug)),
+      getIntegration,
       setupLocal: (input: SetupLocalInput = {}) =>
         Effect.gen(function* () {
           const integration = {
@@ -220,6 +244,7 @@ export const supermemoryPlugin = definePlugin((options: SupermemoryPluginOptions
         id: "supermemory",
         kind: "executor",
         name: "Supermemory",
+        url: "https://supermemory.ai",
         tools: [
           tool({
             name: "setupLocal",
@@ -239,21 +264,17 @@ export const supermemoryPlugin = definePlugin((options: SupermemoryPluginOptions
       id: "supermemory",
       name: "Supermemory",
       summary: "Hosted or local Supermemory memory API",
-      url: options.baseURL,
-      endpoint: options.baseURL,
+      url: "https://supermemory.ai",
+      endpoint: hostedBaseURL,
+      icon: supermemoryIconUrl,
       featured: true,
       transport: "remote" as const,
     },
   ],
-  describeAuthMethods: (integration: { readonly config: unknown }) => {
-    const config = integration.config as SupermemoryIntegrationConfig;
-    return isLocalSupermemoryBaseURL(config.baseURL)
-      ? [localNoAuthMethod, supermemoryApiKeyAuthMethod]
-      : [supermemoryApiKeyAuthMethod];
-  },
+  describeAuthMethods: () => [cloudApiKeyAuthMethod, localNoAuthMethod, localApiKeyAuthMethod],
   describeIntegrationDisplay: (integration: { readonly config: unknown }) => {
     const config = integration.config as SupermemoryIntegrationConfig;
-    return { url: config.baseURL };
+    return { url: "https://supermemory.ai", icon: supermemoryIconUrl, endpoint: config.baseURL };
   },
   detect: ({ url }: { readonly url: string }) =>
     Effect.succeed(
@@ -272,9 +293,14 @@ export const supermemoryPlugin = definePlugin((options: SupermemoryPluginOptions
     Effect.gen(function* () {
       const config = credential.config as SupermemoryIntegrationConfig;
       const apiKey = credential.value?.trim();
+      const baseURL = supermemoryBaseURLForTemplate({
+        template: credential.template,
+        configBaseURL: config.baseURL,
+      });
       const allowLocalNoAuth =
-        String(credential.template) === String(noAuthTemplate) &&
-        isLocalSupermemoryBaseURL(config.baseURL);
+        (String(credential.template) === String(localNoAuthTemplate) ||
+          String(credential.template) === String(noAuthTemplate)) &&
+        isLocalSupermemoryBaseURL(baseURL);
       if ((apiKey == null || apiKey.length === 0) && !allowLocalNoAuth) {
         return ToolResult.fail({
           code: "supermemory_missing_api_key",
@@ -287,7 +313,7 @@ export const supermemoryPlugin = definePlugin((options: SupermemoryPluginOptions
         ctx,
         toolName: String(toolRow.name),
         args,
-        config,
+        config: { ...config, baseURL },
         ...(apiKey == null || apiKey.length === 0 ? {} : { apiKey }),
       });
     }),
