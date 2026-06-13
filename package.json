@@ -1,6 +1,6 @@
 {
   "name": "executor-supermemory",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Executor plugin for Supermemory hosted and local memory APIs.",
   "homepage": "https://github.com/eersnington/executor-supermemory#readme",
   "bugs": {

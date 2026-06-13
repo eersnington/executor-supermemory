@@ -2,13 +2,19 @@ import {
   Effect,
   IntegrationDetectionResult,
   IntegrationSlug,
+  Schema,
   ToolResult,
   definePlugin,
   tool,
 } from "@executor-js/sdk/core";
-import type { InvokeToolInput, PluginCtx } from "@executor-js/sdk/core";
+import type { InvokeToolInput, PluginCtx, StaticToolExecuteContext } from "@executor-js/sdk/core";
 
-import { apiKeyTemplate, resolveSupermemoryIntegrationConfig } from "./integration.ts";
+import {
+  apiKeyTemplate,
+  isLocalSupermemoryBaseURL,
+  noAuthTemplate,
+  resolveSupermemoryIntegrationConfig,
+} from "./integration.ts";
 import type {
   AddIntegrationInput,
   SetupLocalInput,
@@ -24,7 +30,126 @@ import {
 } from "./setup-tool.ts";
 import { executeSupermemoryRequest } from "./supermemory-http.ts";
 import { planSupermemoryRequest } from "./tool-request.ts";
-import { toolDefinitions } from "./tools.ts";
+import {
+  ForgetMemoryInput,
+  ProfileInput,
+  ProjectsListInput,
+  RecallInput,
+  SaveMemoryInput,
+  toolDefinitions,
+} from "./tools.ts";
+
+const SaveMemoryInputStaticSchema = Schema.toStandardSchemaV1(
+  Schema.toStandardJSONSchemaV1(SaveMemoryInput),
+);
+const ForgetMemoryInputStaticSchema = Schema.toStandardSchemaV1(
+  Schema.toStandardJSONSchemaV1(ForgetMemoryInput),
+);
+const RecallInputStaticSchema = Schema.toStandardSchemaV1(
+  Schema.toStandardJSONSchemaV1(RecallInput),
+);
+const ProfileInputStaticSchema = Schema.toStandardSchemaV1(
+  Schema.toStandardJSONSchemaV1(ProfileInput),
+);
+const ProjectsListInputStaticSchema = Schema.toStandardSchemaV1(
+  Schema.toStandardJSONSchemaV1(ProjectsListInput),
+);
+
+function invokeSupermemoryTool(input: {
+  readonly ctx: PluginCtx;
+  readonly toolName: string;
+  readonly args: unknown;
+  readonly config: SupermemoryIntegrationConfig;
+  readonly apiKey?: string;
+}) {
+  const request = planSupermemoryRequest({
+    toolName: input.toolName,
+    args: input.args,
+    config: input.config,
+  });
+  if (!request.ok) return Effect.succeed(request);
+
+  return executeSupermemoryRequest({
+    httpClientLayer: input.ctx.httpClientLayer,
+    baseURL: input.config.baseURL,
+    ...(input.apiKey == null ? {} : { apiKey: input.apiKey }),
+    request: request.data,
+  });
+}
+
+const supermemoryApiKeyAuthMethod = {
+  id: apiKeyTemplate,
+  label: "Supermemory API key",
+  kind: "apikey" as const,
+  template: apiKeyTemplate,
+  placements: [
+    {
+      carrier: "header" as const,
+      name: "Authorization",
+      prefix: "Bearer ",
+      variable: "token",
+    },
+  ],
+};
+
+const localNoAuthMethod = {
+  id: noAuthTemplate,
+  label: "Local Supermemory auto-auth",
+  kind: "none" as const,
+  template: noAuthTemplate,
+};
+
+function localSupermemoryTools(config: SupermemoryIntegrationConfig) {
+  return [
+    tool({
+      name: "memory.save",
+      description:
+        "Save memory-worthy user information, preferences, facts, project context, links, or notes to local Supermemory.",
+      annotations: {
+        requiresApproval: true,
+        approvalDescription: "Save information to local Supermemory",
+      },
+      inputSchema: SaveMemoryInputStaticSchema,
+      execute: (args: SaveMemoryInput, { ctx }: StaticToolExecuteContext) =>
+        invokeSupermemoryTool({ ctx, toolName: "memory.save", args, config }),
+    }),
+    tool({
+      name: "memory.forget",
+      description:
+        "Forget a specific local Supermemory memory by id or exact content match when information is outdated or the user requests removal.",
+      annotations: {
+        requiresApproval: true,
+        approvalDescription: "Forget a local Supermemory memory",
+      },
+      inputSchema: ForgetMemoryInputStaticSchema,
+      execute: (args: ForgetMemoryInput, { ctx }: StaticToolExecuteContext) =>
+        invokeSupermemoryTool({ ctx, toolName: "memory.forget", args, config }),
+    }),
+    tool({
+      name: "recall",
+      description:
+        "Search local Supermemory for relevant memories. By default, also returns profile context for the query.",
+      inputSchema: RecallInputStaticSchema,
+      execute: (args: RecallInput, { ctx }: StaticToolExecuteContext) =>
+        invokeSupermemoryTool({ ctx, toolName: "recall", args, config }),
+    }),
+    tool({
+      name: "profile",
+      description:
+        "Fetch the local Supermemory profile for a container tag, optionally with query results.",
+      inputSchema: ProfileInputStaticSchema,
+      execute: (args: ProfileInput, { ctx }: StaticToolExecuteContext) =>
+        invokeSupermemoryTool({ ctx, toolName: "profile", args, config }),
+    }),
+    tool({
+      name: "projects.list",
+      description: "List local Supermemory projects/container tags.",
+      inputSchema: ProjectsListInputStaticSchema,
+      execute: (args: ProjectsListInput, { ctx }: StaticToolExecuteContext) =>
+        invokeSupermemoryTool({ ctx, toolName: "projects.list", args, config }),
+    }),
+  ];
+}
 
 interface SupermemoryPluginExtension {
   readonly addIntegration: (input?: AddIntegrationInput) => Effect.Effect<void, unknown>;
@@ -80,23 +205,31 @@ export const supermemoryPlugin = definePlugin((options: SupermemoryPluginOptions
         }),
     };
   },
-  staticSources: (self: SupermemoryPluginExtension) => [
-    {
-      id: "supermemory",
-      kind: "executor",
-      name: "Supermemory",
-      tools: [
-        tool({
-          name: "setupLocal",
-          description:
-            "Register a local Supermemory integration and return the browser URL for adding its API key.",
-          inputSchema: setupLocalInputSchema,
-          outputSchema: setupLocalOutputSchema,
-          execute: (input: SetupLocalInput) => self.setupLocal(input),
-        }),
-      ],
-    },
-  ],
+  staticSources: (self: SupermemoryPluginExtension) => {
+    const localConfig = resolveSupermemoryIntegrationConfig({}, options, process.env);
+    const localTools = isLocalSupermemoryBaseURL(localConfig.baseURL)
+      ? localSupermemoryTools(localConfig)
+      : [];
+
+    return [
+      {
+        id: "supermemory",
+        kind: "executor",
+        name: "Supermemory",
+        tools: [
+          tool({
+            name: "setupLocal",
+            description:
+              "Register a local Supermemory integration and return the browser URL for adding its API key.",
+            inputSchema: setupLocalInputSchema,
+            outputSchema: setupLocalOutputSchema,
+            execute: (input: SetupLocalInput) => self.setupLocal(input),
+          }),
+          ...localTools,
+        ],
+      },
+    ];
+  },
   integrationPresets: [
     {
       id: "supermemory",
@@ -108,22 +241,12 @@ export const supermemoryPlugin = definePlugin((options: SupermemoryPluginOptions
       transport: "remote" as const,
     },
   ],
-  describeAuthMethods: () => [
-    {
-      id: apiKeyTemplate,
-      label: "Supermemory API key",
-      kind: "apikey" as const,
-      template: apiKeyTemplate,
-      placements: [
-        {
-          carrier: "header" as const,
-          name: "Authorization",
-          prefix: "Bearer ",
-          variable: "token",
-        },
-      ],
-    },
-  ],
+  describeAuthMethods: (integration: { readonly config: unknown }) => {
+    const config = integration.config as SupermemoryIntegrationConfig;
+    return isLocalSupermemoryBaseURL(config.baseURL)
+      ? [localNoAuthMethod, supermemoryApiKeyAuthMethod]
+      : [supermemoryApiKeyAuthMethod];
+  },
   describeIntegrationDisplay: (integration: { readonly config: unknown }) => {
     const config = integration.config as SupermemoryIntegrationConfig;
     return { url: config.baseURL };
@@ -144,27 +267,24 @@ export const supermemoryPlugin = definePlugin((options: SupermemoryPluginOptions
   invokeTool: ({ ctx, toolRow, credential, args }: InvokeToolInput) =>
     Effect.gen(function* () {
       const config = credential.config as SupermemoryIntegrationConfig;
-      const apiKey = credential.value;
-      if (apiKey == null || apiKey.trim().length === 0) {
+      const apiKey = credential.value?.trim();
+      const allowLocalNoAuth =
+        String(credential.template) === String(noAuthTemplate) &&
+        isLocalSupermemoryBaseURL(config.baseURL);
+      if ((apiKey == null || apiKey.length === 0) && !allowLocalNoAuth) {
         return ToolResult.fail({
           code: "supermemory_missing_api_key",
           message:
-            "The Supermemory connection did not resolve an API key. Reconnect this integration with a hosted Supermemory key or the key printed by the local Supermemory server. No request was sent.",
+            "The Supermemory connection did not resolve an API key. Reconnect this integration with a hosted Supermemory key, or use local no-auth only with a localhost Supermemory server. No request was sent.",
         });
       }
 
-      const request = planSupermemoryRequest({
+      return yield* invokeSupermemoryTool({
+        ctx,
         toolName: String(toolRow.name),
         args,
         config,
-      });
-      if (!request.ok) return request;
-
-      return yield* executeSupermemoryRequest({
-        httpClientLayer: ctx.httpClientLayer,
-        baseURL: config.baseURL,
-        apiKey,
-        request: request.data,
+        ...(apiKey == null || apiKey.length === 0 ? {} : { apiKey }),
       });
     }),
 }));

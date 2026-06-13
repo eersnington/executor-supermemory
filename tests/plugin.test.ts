@@ -40,6 +40,24 @@ test("supermemory exposes a local setup tool for Executor CLI users", () => {
   ]);
 });
 
+test("local Supermemory options expose static no-auth memory tools", () => {
+  const plugin = supermemoryPlugin({
+    baseURL: "http://localhost:6767",
+    defaultContainerTag: "project_alpha",
+  });
+  const extension = { setupLocal: () => Effect.succeed(null) };
+  const sources = plugin.staticSources!(extension as never);
+
+  expect(sources[0]?.tools.map((tool: { readonly name: string }) => tool.name).sort()).toEqual([
+    "memory.forget",
+    "memory.save",
+    "profile",
+    "projects.list",
+    "recall",
+    "setupLocal",
+  ]);
+});
+
 test("setupLocal registers a local Supermemory integration and returns handoff URL", async () => {
   const registered: unknown[] = [];
   const plugin = supermemoryPlugin({ defaultContainerTag: "project_alpha" });
@@ -77,7 +95,7 @@ test("setupLocal registers a local Supermemory integration and returns handoff U
     handoffUrl:
       "/integrations/supermemory?addAccount=1&owner=org&template=api-key&label=Local+Supermemory",
     instructions:
-      "Open /integrations/supermemory?addAccount=1&owner=org&template=api-key&label=Local+Supermemory and paste the API key printed by `npx supermemory local`.",
+      "Open /integrations/supermemory?addAccount=1&owner=org&template=api-key&label=Local+Supermemory and paste the API key printed by your local Supermemory server.",
   });
 });
 
@@ -200,6 +218,51 @@ test("projects.list gets Supermemory v3 projects", async () => {
   });
 });
 
+test("static local recall omits Authorization for localhost auto-auth", async () => {
+  const requests: CapturedRequest[] = [];
+  const plugin = supermemoryPlugin({
+    baseURL: "http://localhost:6767",
+    defaultContainerTag: "project_alpha",
+  });
+  const extension = { setupLocal: () => Effect.succeed(null) };
+  const source = plugin.staticSources!(extension as never)[0]!;
+  const recall = source.tools.find((tool: { readonly name: string }) => tool.name === "recall")!;
+
+  const result = await Effect.runPromise(
+    recall.handler({
+      args: { query: "deploy errors" },
+      ctx: { httpClientLayer: fakeHttpClient(requests, responseFor("recall")) } as never,
+      elicit: (() => Effect.die("not used")) as never,
+    }),
+  );
+
+  expect(result).toEqual({ ok: true, data: { profile: "Uses Vite+", results: [] } });
+  expect(requests[0]).toEqual({
+    method: "POST",
+    url: "http://localhost:6767/v4/profile",
+    authorization: undefined,
+    body: { containerTag: "project_alpha", q: "deploy errors" },
+  });
+});
+
+test("dynamic no-auth connection omits Authorization for local Supermemory", async () => {
+  const requests: CapturedRequest[] = [];
+  const result = await invoke(
+    "recall",
+    { query: "deploy errors" },
+    requests,
+    responseFor("recall"),
+    {
+      template: AuthTemplateSlug.make("none"),
+      value: null,
+      values: {},
+    },
+  );
+
+  expect(result).toEqual({ ok: true, data: { profile: "Uses Vite+", results: [] } });
+  expect(requests[0]?.authorization).toBe(undefined);
+});
+
 test("non-2xx text response returns a structured http error", async () => {
   const requests: CapturedRequest[] = [];
   const result = await invoke("recall", { query: "deploy errors" }, requests, {
@@ -223,6 +286,11 @@ async function invoke(
   args: unknown,
   requests: CapturedRequest[],
   response: { readonly status: number; readonly body: unknown } = responseFor(toolName),
+  credentialOverrides: Partial<{
+    readonly template: AuthTemplateSlug;
+    readonly value: string | null;
+    readonly values: Record<string, string | null>;
+  }> = {},
 ) {
   const plugin = supermemoryPlugin();
   return await Effect.runPromise(
@@ -237,6 +305,7 @@ async function invoke(
         value: "sm_test",
         values: { token: "sm_test" },
         config,
+        ...credentialOverrides,
       },
       args,
       elicit: (() => Effect.die("not used")) as never,

@@ -42,7 +42,8 @@ export const ProfileInput = Schema.Struct({
 });
 export type ProfileInput = typeof ProfileInput.Type;
 
-const ProjectsListInput = Schema.Struct({});
+export const ProjectsListInput = Schema.Struct({});
+export type ProjectsListInput = typeof ProjectsListInput.Type;
 
 export const toolDefinitions = [
   {

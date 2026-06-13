@@ -1,5 +1,4 @@
 import { Schema } from "@executor-js/sdk/core";
-import type { StaticToolSchema } from "@executor-js/sdk/core";
 
 import { apiKeyTemplate, localBaseURL } from "./integration.ts";
 import type { SetupLocalInput, SupermemoryPluginOptions } from "./integration.ts";
@@ -18,14 +17,12 @@ const SetupLocalOutputSchema = Schema.Struct({
   instructions: Schema.String,
 });
 
-const schemaToStandard = <A, I>(schema: Schema.Decoder<A, I>): StaticToolSchema<A, I> =>
-  Schema.toStandardSchemaV1(Schema.toStandardJSONSchemaV1(schema) as never) as StaticToolSchema<
-    A,
-    I
-  >;
-
-export const setupLocalInputSchema = schemaToStandard(SetupLocalInputSchema);
-export const setupLocalOutputSchema = schemaToStandard(SetupLocalOutputSchema);
+export const setupLocalInputSchema = Schema.toStandardSchemaV1(
+  Schema.toStandardJSONSchemaV1(SetupLocalInputSchema),
+);
+export const setupLocalOutputSchema = Schema.toStandardSchemaV1(
+  Schema.toStandardJSONSchemaV1(SetupLocalOutputSchema),
+);
 
 export function localSetupIntegrationInput(
   input: SetupLocalInput,
@@ -58,5 +55,5 @@ export function connectionHandoffUrl(input: {
 }
 
 export function setupLocalInstructions(input: { readonly handoffUrl: string }) {
-  return `Open ${input.handoffUrl} and paste the API key printed by \`npx supermemory local\`.`;
+  return `Open ${input.handoffUrl} and paste the API key printed by your local Supermemory server.`;
 }

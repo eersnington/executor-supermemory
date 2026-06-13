@@ -3,6 +3,7 @@ import { AuthTemplateSlug } from "@executor-js/sdk/core";
 export const hostedBaseURL = "https://api.supermemory.ai";
 export const localBaseURL = "http://localhost:6767";
 export const apiKeyTemplate = AuthTemplateSlug.make("api-key");
+export const noAuthTemplate = AuthTemplateSlug.make("none");
 
 export interface SupermemoryPluginOptions {
   readonly baseURL?: string;
@@ -43,32 +44,44 @@ export interface SupermemoryIntegrationConfig {
   };
 }
 
+const nonEmpty = (value: string | undefined): string | undefined => {
+  const trimmed = value?.trim();
+  return trimmed == null || trimmed.length === 0 ? undefined : trimmed;
+};
+
 export function resolveSupermemoryIntegrationConfig(
   input: AddIntegrationInput,
   options: SupermemoryPluginOptions,
   env: NodeJS.ProcessEnv,
 ): SupermemoryIntegrationConfig {
-  const envApiURL = env.SUPERMEMORY_API_URL;
-  const envBaseURL = env.SUPERMEMORY_BASE_URL;
   const baseURL = (
-    input.baseURL ??
-    options.baseURL ??
-    (envApiURL == null || envApiURL.trim().length === 0 ? undefined : envApiURL) ??
-    (envBaseURL == null || envBaseURL.trim().length === 0 ? undefined : envBaseURL) ??
+    nonEmpty(input.baseURL) ??
+    nonEmpty(options.baseURL) ??
+    nonEmpty(env.SUPERMEMORY_API_URL) ??
+    nonEmpty(env.SUPERMEMORY_BASE_URL) ??
     hostedBaseURL
   ).replace(/\/+$/, "");
-  const defaultContainerTag = input.defaultContainerTag ?? options.defaultContainerTag;
+  const defaultContainerTag =
+    nonEmpty(input.defaultContainerTag) ?? nonEmpty(options.defaultContainerTag);
 
   return {
     kind: "supermemory",
     baseURL,
-    ...(defaultContainerTag == null || defaultContainerTag.trim().length === 0
-      ? {}
-      : { defaultContainerTag }),
+    ...(defaultContainerTag == null ? {} : { defaultContainerTag }),
     defaults: {
       searchMode: input.defaults?.searchMode ?? options.defaultSearchMode ?? "hybrid",
       limit: input.defaults?.limit ?? options.defaultLimit ?? 10,
       threshold: input.defaults?.threshold ?? options.defaultThreshold ?? 0.6,
     },
   };
+}
+
+export function isLocalSupermemoryBaseURL(baseURL: string): boolean {
+  const normalized = baseURL.trim();
+  if (!URL.canParse(normalized)) return false;
+  const url = new URL(normalized);
+  return (
+    url.protocol === "http:" &&
+    (url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "::1")
+  );
 }

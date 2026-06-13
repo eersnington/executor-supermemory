@@ -9,24 +9,35 @@ export interface SupermemoryRequestPlan {
   readonly body?: unknown;
 }
 
+const missingContainerTag = () =>
+  ToolResult.fail({
+    code: "supermemory_missing_container_tag",
+    message:
+      "Supermemory container tag is missing. Pass containerTag or configure defaultContainerTag on the integration. No request was sent.",
+  });
+
+function resolveContainerTag(input: {
+  readonly containerTag?: string;
+  readonly config: SupermemoryIntegrationConfig;
+}) {
+  const containerTag = input.containerTag ?? input.config.defaultContainerTag;
+  const trimmed = containerTag?.trim();
+  return trimmed == null || trimmed.length === 0 ? undefined : trimmed;
+}
+
 export function planSupermemoryRequest(input: {
   readonly toolName: string;
   readonly args: unknown;
   readonly config: SupermemoryIntegrationConfig;
 }) {
-  const args = input.args as Record<string, unknown>;
-
   switch (input.toolName) {
     case "memory.save": {
-      const toolInput = args as SaveMemoryInput;
-      const containerTag = toolInput.containerTag ?? input.config.defaultContainerTag;
-      if (containerTag == null || containerTag.trim().length === 0) {
-        return ToolResult.fail({
-          code: "supermemory_missing_container_tag",
-          message:
-            "Supermemory container tag is missing. Pass containerTag or configure defaultContainerTag on the integration. No request was sent.",
-        });
-      }
+      const toolInput = input.args as SaveMemoryInput;
+      const containerTag = resolveContainerTag({
+        containerTag: toolInput.containerTag,
+        config: input.config,
+      });
+      if (containerTag == null) return missingContainerTag();
 
       return ToolResult.ok({
         method: "POST",
@@ -42,7 +53,7 @@ export function planSupermemoryRequest(input: {
     }
 
     case "memory.forget": {
-      const toolInput = args as ForgetMemoryInput;
+      const toolInput = input.args as ForgetMemoryInput;
       if (toolInput.id == null && toolInput.content == null) {
         return ToolResult.fail({
           code: "supermemory_missing_memory_identifier",
@@ -50,14 +61,11 @@ export function planSupermemoryRequest(input: {
             "Forgetting a Supermemory memory requires either id or exact content. No request was sent.",
         });
       }
-      const containerTag = toolInput.containerTag ?? input.config.defaultContainerTag;
-      if (containerTag == null || containerTag.trim().length === 0) {
-        return ToolResult.fail({
-          code: "supermemory_missing_container_tag",
-          message:
-            "Supermemory container tag is missing. Pass containerTag or configure defaultContainerTag on the integration. No request was sent.",
-        });
-      }
+      const containerTag = resolveContainerTag({
+        containerTag: toolInput.containerTag,
+        config: input.config,
+      });
+      if (containerTag == null) return missingContainerTag();
 
       return ToolResult.ok({
         method: "DELETE",
@@ -72,15 +80,12 @@ export function planSupermemoryRequest(input: {
     }
 
     case "recall": {
-      const toolInput = args as RecallInput;
-      const containerTag = toolInput.containerTag ?? input.config.defaultContainerTag;
-      if (containerTag == null || containerTag.trim().length === 0) {
-        return ToolResult.fail({
-          code: "supermemory_missing_container_tag",
-          message:
-            "Supermemory container tag is missing. Pass containerTag or configure defaultContainerTag on the integration. No request was sent.",
-        });
-      }
+      const toolInput = input.args as RecallInput;
+      const containerTag = resolveContainerTag({
+        containerTag: toolInput.containerTag,
+        config: input.config,
+      });
+      if (containerTag == null) return missingContainerTag();
 
       if (toolInput.includeProfile === false) {
         return ToolResult.ok({
@@ -108,15 +113,12 @@ export function planSupermemoryRequest(input: {
     }
 
     case "profile": {
-      const toolInput = args as ProfileInput;
-      const containerTag = toolInput.containerTag ?? input.config.defaultContainerTag;
-      if (containerTag == null || containerTag.trim().length === 0) {
-        return ToolResult.fail({
-          code: "supermemory_missing_container_tag",
-          message:
-            "Supermemory container tag is missing. Pass containerTag or configure defaultContainerTag on the integration. No request was sent.",
-        });
-      }
+      const toolInput = input.args as ProfileInput;
+      const containerTag = resolveContainerTag({
+        containerTag: toolInput.containerTag,
+        config: input.config,
+      });
+      if (containerTag == null) return missingContainerTag();
 
       return ToolResult.ok({
         method: "POST",
