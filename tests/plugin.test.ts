@@ -28,10 +28,12 @@ const config = {
 
 const owner = "org" as Owner;
 
+const staticSourcesFor = (plugin: ReturnType<typeof supermemoryPlugin>) =>
+  plugin.staticSources!({ setupLocal: () => Effect.succeed(null) } as never);
+
 test("supermemory exposes a local setup tool for Executor CLI users", () => {
   const plugin = supermemoryPlugin();
-  const extension = { setupLocal: () => Effect.succeed(null) };
-  const sources = plugin.staticSources!(extension as never);
+  const sources = staticSourcesFor(plugin);
 
   expect(sources).toHaveLength(1);
   expect(sources[0]).toMatchObject({ id: "supermemory", kind: "executor", name: "Supermemory" });
@@ -45,8 +47,7 @@ test("local Supermemory options expose static no-auth memory tools", () => {
     baseURL: "http://localhost:6767",
     defaultContainerTag: "project_alpha",
   });
-  const extension = { setupLocal: () => Effect.succeed(null) };
-  const sources = plugin.staticSources!(extension as never);
+  const sources = staticSourcesFor(plugin);
 
   expect(sources[0]?.tools.map((tool: { readonly name: string }) => tool.name).sort()).toEqual([
     "memory.forget",
@@ -224,8 +225,7 @@ test("static local recall omits Authorization for localhost auto-auth", async ()
     baseURL: "http://localhost:6767",
     defaultContainerTag: "project_alpha",
   });
-  const extension = { setupLocal: () => Effect.succeed(null) };
-  const source = plugin.staticSources!(extension as never)[0]!;
+  const source = staticSourcesFor(plugin)[0]!;
   const recall = source.tools.find((tool: { readonly name: string }) => tool.name === "recall")!;
 
   const result = await Effect.runPromise(

@@ -12,6 +12,7 @@ import type { InvokeToolInput, PluginCtx, StaticToolExecuteContext } from "@exec
 import {
   apiKeyTemplate,
   isLocalSupermemoryBaseURL,
+  localBaseURL,
   noAuthTemplate,
   resolveSupermemoryIntegrationConfig,
 } from "./integration.ts";
@@ -23,7 +24,6 @@ import type {
 } from "./integration.ts";
 import {
   connectionHandoffUrl,
-  localSetupIntegrationInput,
   setupLocalInputSchema,
   setupLocalInstructions,
   setupLocalOutputSchema,
@@ -100,6 +100,11 @@ const localNoAuthMethod = {
 };
 
 function localSupermemoryTools(config: SupermemoryIntegrationConfig) {
+  const execute =
+    (toolName: string) =>
+    (args: unknown, { ctx }: StaticToolExecuteContext) =>
+      invokeSupermemoryTool({ ctx, toolName, args, config });
+
   return [
     tool({
       name: "memory.save",
@@ -110,8 +115,7 @@ function localSupermemoryTools(config: SupermemoryIntegrationConfig) {
         approvalDescription: "Save information to local Supermemory",
       },
       inputSchema: SaveMemoryInputStaticSchema,
-      execute: (args: SaveMemoryInput, { ctx }: StaticToolExecuteContext) =>
-        invokeSupermemoryTool({ ctx, toolName: "memory.save", args, config }),
+      execute: execute("memory.save"),
     }),
     tool({
       name: "memory.forget",
@@ -122,31 +126,27 @@ function localSupermemoryTools(config: SupermemoryIntegrationConfig) {
         approvalDescription: "Forget a local Supermemory memory",
       },
       inputSchema: ForgetMemoryInputStaticSchema,
-      execute: (args: ForgetMemoryInput, { ctx }: StaticToolExecuteContext) =>
-        invokeSupermemoryTool({ ctx, toolName: "memory.forget", args, config }),
+      execute: execute("memory.forget"),
     }),
     tool({
       name: "recall",
       description:
         "Search local Supermemory for relevant memories. By default, also returns profile context for the query.",
       inputSchema: RecallInputStaticSchema,
-      execute: (args: RecallInput, { ctx }: StaticToolExecuteContext) =>
-        invokeSupermemoryTool({ ctx, toolName: "recall", args, config }),
+      execute: execute("recall"),
     }),
     tool({
       name: "profile",
       description:
         "Fetch the local Supermemory profile for a container tag, optionally with query results.",
       inputSchema: ProfileInputStaticSchema,
-      execute: (args: ProfileInput, { ctx }: StaticToolExecuteContext) =>
-        invokeSupermemoryTool({ ctx, toolName: "profile", args, config }),
+      execute: execute("profile"),
     }),
     tool({
       name: "projects.list",
       description: "List local Supermemory projects/container tags.",
       inputSchema: ProjectsListInputStaticSchema,
-      execute: (args: ProjectsListInput, { ctx }: StaticToolExecuteContext) =>
-        invokeSupermemoryTool({ ctx, toolName: "projects.list", args, config }),
+      execute: execute("projects.list"),
     }),
   ];
 }
@@ -188,7 +188,11 @@ export const supermemoryPlugin = definePlugin((options: SupermemoryPluginOptions
         ctx.core.integrations.get(IntegrationSlug.make(slug)),
       setupLocal: (input: SetupLocalInput = {}) =>
         Effect.gen(function* () {
-          const integration = localSetupIntegrationInput(input, options);
+          const integration = {
+            slug: input.slug ?? "supermemory",
+            baseURL: input.baseURL ?? options.baseURL ?? localBaseURL,
+            defaultContainerTag: input.defaultContainerTag ?? options.defaultContainerTag,
+          };
           yield* addIntegration(integration);
           const handoffUrl = connectionHandoffUrl({
             webBaseUrl: process.env.EXECUTOR_WEB_BASE_URL,

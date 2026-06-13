@@ -55,24 +55,18 @@ export function executeSupermemoryRequest(input: {
     );
     if (isToolResult(text)) return text;
 
-    if (text.length === 0) {
-      if (response.status >= 200 && response.status < 300) return ToolResult.ok(null);
+    const ok = response.status >= 200 && response.status < 300;
+    if (!ok) {
+      const fallback = `Supermemory returned HTTP ${response.status}. Check the request, credentials, and Supermemory server logs before retrying.`;
       return ToolResult.fail({
         code: "supermemory_http_error",
         status: response.status,
-        message: `Supermemory returned HTTP ${response.status}. Check the request, credentials, and Supermemory server logs before retrying.`,
-      });
-    }
-
-    if (response.status < 200 || response.status >= 300) {
-      const message = `Supermemory returned HTTP ${response.status}. Check the request, credentials, and Supermemory server logs before retrying.`;
-      return ToolResult.fail({
-        code: "supermemory_http_error",
-        status: response.status,
-        message: text.length === 0 ? message : text,
+        message: text.length === 0 ? fallback : text,
         ...(text.length === 0 ? {} : { details: text }),
       });
     }
+
+    if (text.length === 0) return ToolResult.ok(null);
 
     return yield* Effect.try({
       try: () => JSON.parse(text) as unknown,

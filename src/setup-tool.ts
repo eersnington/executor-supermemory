@@ -1,7 +1,6 @@
 import { Schema } from "@executor-js/sdk/core";
 
-import { apiKeyTemplate, localBaseURL } from "./integration.ts";
-import type { SetupLocalInput, SupermemoryPluginOptions } from "./integration.ts";
+import { apiKeyTemplate } from "./integration.ts";
 
 const SetupLocalInputSchema = Schema.Struct({
   slug: Schema.optional(Schema.String),
@@ -23,17 +22,6 @@ export const setupLocalInputSchema = Schema.toStandardSchemaV1(
 export const setupLocalOutputSchema = Schema.toStandardSchemaV1(
   Schema.toStandardJSONSchemaV1(SetupLocalOutputSchema),
 );
-
-export function localSetupIntegrationInput(
-  input: SetupLocalInput,
-  options: SupermemoryPluginOptions,
-) {
-  return {
-    slug: input.slug ?? "supermemory",
-    baseURL: input.baseURL ?? options.baseURL ?? localBaseURL,
-    defaultContainerTag: input.defaultContainerTag ?? options.defaultContainerTag,
-  };
-}
 
 export function connectionHandoffUrl(input: {
   readonly webBaseUrl?: string;
