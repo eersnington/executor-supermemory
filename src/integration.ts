@@ -2,6 +2,10 @@ import { AuthTemplateSlug } from "@executor-js/sdk/core";
 
 export const hostedBaseURL = "https://api.supermemory.ai";
 export const localBaseURL = "http://localhost:6767";
+export const supermemoryIconUrl = "https://supermemory.ai/favicon.svg";
+export const cloudApiKeyTemplate = AuthTemplateSlug.make("cloud-api-key");
+export const localApiKeyTemplate = AuthTemplateSlug.make("local-api-key");
+export const localNoAuthTemplate = AuthTemplateSlug.make("local-none");
 export const apiKeyTemplate = AuthTemplateSlug.make("api-key");
 export const noAuthTemplate = AuthTemplateSlug.make("none");
 
@@ -42,6 +46,18 @@ export interface SupermemoryIntegrationConfig {
     readonly limit: number;
     readonly threshold: number;
   };
+}
+
+export function supermemoryBaseURLForTemplate(input: {
+  readonly template: unknown;
+  readonly configBaseURL: string;
+}): string {
+  const template = String(input.template);
+  if (template === String(cloudApiKeyTemplate)) return hostedBaseURL;
+  if (template === String(localApiKeyTemplate) || template === String(localNoAuthTemplate)) {
+    return localBaseURL;
+  }
+  return input.configBaseURL;
 }
 
 const nonEmpty = (value: string | undefined): string | undefined => {

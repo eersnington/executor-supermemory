@@ -94,9 +94,9 @@ test("setupLocal registers a local Supermemory integration and returns handoff U
   expect(result).toEqual({
     integration: "supermemory",
     handoffUrl:
-      "/integrations/supermemory?addAccount=1&owner=org&template=api-key&label=Local+Supermemory",
+      "/integrations/supermemory?addAccount=1&owner=org&template=local-api-key&label=Local+Supermemory",
     instructions:
-      "Open /integrations/supermemory?addAccount=1&owner=org&template=api-key&label=Local+Supermemory and paste the API key printed by your local Supermemory server.",
+      "Open /integrations/supermemory?addAccount=1&owner=org&template=local-api-key&label=Local+Supermemory and paste the API key printed by your local Supermemory server.",
   });
 });
 
@@ -253,7 +253,7 @@ test("dynamic no-auth connection omits Authorization for local Supermemory", asy
     requests,
     responseFor("recall"),
     {
-      template: AuthTemplateSlug.make("none"),
+      template: AuthTemplateSlug.make("local-none"),
       value: null,
       values: {},
     },
@@ -261,6 +261,26 @@ test("dynamic no-auth connection omits Authorization for local Supermemory", asy
 
   expect(result).toEqual({ ok: true, data: { profile: "Uses Vite+", results: [] } });
   expect(requests[0]?.authorization).toBe(undefined);
+});
+
+test("cloud API key connections call hosted Supermemory", async () => {
+  const requests: CapturedRequest[] = [];
+  await invoke("projects.list", {}, requests, responseFor("projects.list"), {
+    template: AuthTemplateSlug.make("cloud-api-key"),
+  });
+
+  expect(requests[0]?.url).toBe("https://api.supermemory.ai/v3/projects");
+  expect(requests[0]?.authorization).toBe("Bearer sm_test");
+});
+
+test("local API key connections call local Supermemory", async () => {
+  const requests: CapturedRequest[] = [];
+  await invoke("projects.list", {}, requests, responseFor("projects.list"), {
+    template: AuthTemplateSlug.make("local-api-key"),
+  });
+
+  expect(requests[0]?.url).toBe("http://localhost:6767/v3/projects");
+  expect(requests[0]?.authorization).toBe("Bearer sm_test");
 });
 
 test("non-2xx text response returns a structured http error", async () => {

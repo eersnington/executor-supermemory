@@ -1,6 +1,6 @@
 import { Schema } from "@executor-js/sdk/core";
 
-import { apiKeyTemplate } from "./integration.ts";
+import { localApiKeyTemplate } from "./integration.ts";
 
 const SetupLocalInputSchema = Schema.Struct({
   slug: Schema.optional(Schema.String),
@@ -31,7 +31,7 @@ export function connectionHandoffUrl(input: {
 }) {
   const search = new URLSearchParams({ addAccount: "1" });
   search.set("owner", input.owner ?? "org");
-  search.set("template", String(apiKeyTemplate));
+  search.set("template", String(localApiKeyTemplate));
   search.set("label", input.label ?? "Local Supermemory");
   const path = `/integrations/${encodeURIComponent(input.integration)}?${search.toString()}`;
 
